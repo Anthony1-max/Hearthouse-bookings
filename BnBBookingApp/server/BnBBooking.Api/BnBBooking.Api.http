@@ -1,0 +1,6 @@
+@BnBBooking.Api_HostAddress = http://localhost:5273
+
+GET {{BnBBooking.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

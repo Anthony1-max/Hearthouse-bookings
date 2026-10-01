@@ -1,0 +1,62 @@
+name: Build and deploy Hearth House
+
+"on":
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hearth-house-production
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build React client
+        working-directory: client
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build ASP.NET API
+        run: |
+          dotnet restore server/BnBBooking.Api/BnBBooking.Api.csproj
+          dotnet build server/BnBBooking.Api/BnBBooking.Api.csproj --configuration Release --no-restore
+
+      - name: Publish App Service package
+        run: dotnet publish server/BnBBooking.Api/BnBBooking.Api.csproj --configuration Release --no-build --output ./publish
+
+      - name: Generate SQL migration script
+        run: |
+          dotnet tool install dotnet-ef --tool-path ./.tools --version 8.0.31
+          mkdir -p artifacts
+          ./.tools/dotnet-ef migrations script --idempotent --project server/BnBBooking.Api --startup-project server/BnBBooking.Api --output artifacts/HearthHouse.sql
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HearthHouse-database-migration
+          path: artifacts/HearthHouse.sql
+          if-no-files-found: error
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish

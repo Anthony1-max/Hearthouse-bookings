@@ -1,0 +1,11 @@
+**/node_modules/
+**/bin/
+**/obj/
+client/dist/
+server/BnBBooking.Api/wwwroot/
+.tools/
+publish/
+.vs/
+.env
+.env.*
+!.env.example
